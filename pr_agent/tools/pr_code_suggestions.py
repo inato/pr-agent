@@ -46,6 +46,7 @@ class PRCodeSuggestions:
             num_code_suggestions = get_settings().pr_code_suggestions.num_code_suggestions
 
         self.ai_handler = ai_handler()
+        self.ai_handler.main_pr_language = self.main_language
         self.patches_diff = None
         self.prediction = None
         self.cli_mode = cli_mode
@@ -116,10 +117,21 @@ class PRCodeSuggestions:
                         pr_body += HelpMessage.get_improve_usage_guide()
                         pr_body += "\n</details>\n"
 
-                    if self.progress_response:
-                        self.git_provider.edit_comment(self.progress_response, body=pr_body)
+                    if get_settings().pr_code_suggestions.persistent_comment:
+                        final_update_message = False
+                        self.git_provider.publish_persistent_comment(pr_body,
+                                                                     initial_header="## PR Code Suggestions",
+                                                                     update_header=True,
+                                                                     name="suggestions",
+                                                                     final_update_message=final_update_message, )
+                        if self.progress_response:
+                            self.progress_response.delete()
                     else:
-                        self.git_provider.publish_comment(pr_body)
+
+                        if self.progress_response:
+                            self.git_provider.edit_comment(self.progress_response, body=pr_body)
+                        else:
+                            self.git_provider.publish_comment(pr_body)
 
                 else:
                     self.push_inline_code_suggestions(data)
@@ -393,11 +405,7 @@ class PRCodeSuggestions:
 
             for label, suggestions in suggestions_labels.items():
                 num_suggestions=len(suggestions)
-                # pr_body += f"""<tr><td><strong>{label}</strong></td>"""
                 pr_body += f"""<tr><td rowspan={num_suggestions}><strong>{label.capitalize()}</strong></td>\n"""
-                # pr_body += f"""<td>"""
-                # pr_body += f"""<details><summary>{len(suggestions)} suggestions</summary>"""
-                # pr_body += f"""<table>"""
                 for i, suggestion in enumerate(suggestions):
 
                     relevant_file = suggestion['relevant_file'].strip()
@@ -444,11 +452,11 @@ class PRCodeSuggestions:
 {example_code}                   
 """
                     pr_body += f"</details>"
-
                     pr_body += f"</td></tr>"
 
+
                 # pr_body += "</details>"
-                pr_body += """</td></tr>"""
+                # pr_body += """</td></tr>"""
             pr_body += """</tr></tbody></table>"""
             return pr_body
         except Exception as e:
